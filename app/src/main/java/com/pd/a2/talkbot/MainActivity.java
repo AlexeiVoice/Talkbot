@@ -1,6 +1,8 @@
 package com.pd.a2.talkbot;
 
+import android.content.Context;
 import android.net.Uri;
+import android.os.PowerManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -9,14 +11,18 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
+import android.app.KeyguardManager;
 
 public class MainActivity extends AppCompatActivity {
     WindowManager.LayoutParams params;
+    PowerManager.WakeLock fullWakeLock, partialWakeLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+
         Button btnMakeBrighter = (Button)findViewById(R.id.raiseBrightness);
         btnMakeBrighter.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -105,5 +111,37 @@ public class MainActivity extends AppCompatActivity {
         WindowManager.LayoutParams lp = mywindow.getAttributes();
         lp.screenBrightness = value;
         mywindow.setAttributes(lp);
+    }
+
+    // Called from onCreate
+    protected void createWakeLocks(){
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        fullWakeLock = powerManager.newWakeLock((PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP), "Loneworker - FULL WAKE LOCK");
+        partialWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Talkbot - PARTIAL WAKE LOCK");
+    }
+
+    @Override
+    protected void onPause(){
+        super.onPause();
+        partialWakeLock.acquire();
+    }
+
+    @Override
+    protected void onResume(){
+        super.onResume();
+        if(fullWakeLock.isHeld()){
+            fullWakeLock.release();
+        }
+        if(partialWakeLock.isHeld()){
+            partialWakeLock.release();
+        }
+    }
+
+    // Called whenever we need to wake up the device
+    public void wakeDevice() {
+        fullWakeLock.acquire();
+
+        KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+
     }
 }
