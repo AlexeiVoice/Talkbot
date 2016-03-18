@@ -90,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause(){
         super.onPause();
         partialWakeLock.acquire();
+        stopSound();
     }
 
     @Override
@@ -155,10 +156,16 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Log.i(getClass().getSimpleName(), "playSound(). File uri: " + uri.toString());
-        mediaPlayer = new MediaPlayer();
+
         if (!isExternalStorageReadable()) {
             Log.i(getClass().getSimpleName(), "playSound(): external storage isn't readable");
             return;
+        }
+        //we should stop playing audio-file if it's playing at the moment
+        if (mediaPlayer!=null && mediaPlayer.isPlaying()) {
+            mediaPlayer.stop();
+        } else{
+            mediaPlayer = new MediaPlayer();
         }
         try {
             mediaPlayer.setDataSource(getApplicationContext(), uri);
@@ -183,8 +190,6 @@ public class MainActivity extends AppCompatActivity {
             mediaPlayer.release();
         }
     }
-
-
 
     public void showMessage(String message){
         Toast.makeText(this, message,Toast.LENGTH_SHORT).show();
