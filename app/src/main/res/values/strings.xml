@@ -1,3 +1,77 @@
 <resources>
     <string name="app_name">Talkbot</string>
+    <string name="audio_folder">Talkbot/audio</string>
+    <!-- - - - AUDIO-FILES NAMES - - - -->
+            <!--Numbers-->
+    <string name="_0">audio-0.mp3</string>
+    <string name="_1">audio-1.mp3</string>
+    <string name="_2">audio-2.mp3</string>
+    <string name="_3">audio-3.mp3</string>
+    <string name="_4">audio-4.mp3</string>
+    <string name="_5">audio-5.mp3</string>
+    <string name="_6">audio-6.mp3</string>
+    <string name="_7">audio-7.mp3</string>
+    <string name="_8">audio-8.mp3</string>
+    <string name="_9">audio-9.mp3</string>
+
+            <!--Small characters-->
+    <string name="a">audio-a.mp3</string>
+    <string name="b">audio-b.mp3</string>
+    <string name="c">audio-c.mp3</string>
+    <string name="d">audio-d.mp3</string>
+    <string name="e">audio-e.mp3</string>
+    <string name="f">audio-f.mp3</string>
+    <string name="g">audio-g.mp3</string>
+    <string name="h">audio-h.mp3</string>
+
+    <string name="i">audio-i.mp3</string>
+    <string name="j">audio-j.mp3</string>
+    <string name="k">audio-k.mp3</string>
+    <string name="l">audio-l.mp3</string>
+    <string name="m">audio-m.mp3</string>
+    <string name="n">audio-n.mp3</string>
+    <string name="o">audio-o.mp3</string>
+    <string name="p">audio-p.mp3</string>
+    <string name="q">audio-q.mp3</string>
+
+    <string name="r">audio-r.mp3</string>
+    <string name="s">audio-s.mp3</string>
+    <string name="t">audio-t.mp3</string>
+    <string name="u">audio-u.mp3</string>
+    <string name="v">audio-v.mp3</string>
+    <string name="w">audio-w.mp3</string>
+    <string name="x">audio-x.mp3</string>
+    <string name="y">audio-y.mp3</string>
+    <string name="z">audio-z.mp3</string>
+
+            <!--Large characters-->
+    <string name="A">audio-ba.mp3</string>
+    <string name="B">audio-bb.mp3</string>
+    <string name="C">audio-bc.mp3</string>
+    <string name="D">audio-bd.mp3</string>
+    <string name="E">audio-be.mp3</string>
+    <string name="F">audio-bf.mp3</string>
+    <string name="G">audio-bg.mp3</string>
+    <string name="H">audio-bh.mp3</string>
+
+    <string name="I">audio-bi.mp3</string>
+    <string name="J">audio-bj.mp3</string>
+    <string name="K">audio-bk.mp3</string>
+    <string name="L">audio-bl.mp3</string>
+    <string name="M">audio-bm.mp3</string>
+    <string name="N">audio-bn.mp3</string>
+    <string name="O">audio-bo.mp3</string>
+    <string name="P">audio-bp.mp3</string>
+    <string name="Q">audio-bq.mp3</string>
+
+    <string name="R">audio-br.mp3</string>
+    <string name="S">audio-bs.mp3</string>
+    <string name="T">audio-bt.mp3</string>
+    <string name="U">audio-bu.mp3</string>
+    <string name="V">audio-bv.mp3</string>
+    <string name="W">audio-bw.mp3</string>
+    <string name="X">audio-bx.mp3</string>
+    <string name="Y">audio-by.mp3</string>
+    <string name="Z">audio-bz.mp3</string>
+    <!-- - - - - - - - - - - - - - - -  -->
 </resources>
