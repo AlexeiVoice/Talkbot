@@ -3,6 +3,7 @@ package com.pd.a2.talkbot;
 import android.content.Context;
 import android.net.Uri;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -16,13 +17,19 @@ import android.app.KeyguardManager;
 public class MainActivity extends AppCompatActivity {
     WindowManager.LayoutParams params;
     PowerManager.WakeLock fullWakeLock, partialWakeLock;
+    private static final int DELAY = 0;
+    int defTimeOut = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        setBright(0f);
         this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
-
+        defTimeOut = Settings.System.getInt(getContentResolver(),
+                Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
+        Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
+        createWakeLocks();
         Button btnMakeBrighter = (Button)findViewById(R.id.raiseBrightness);
         btnMakeBrighter.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -86,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
                 showMessage("J");
                 return true;
             case KeyEvent.KEYCODE_0:
+                wakeDevice();
                 showMessage("0");
                 return true;
             case KeyEvent.KEYCODE_1:
@@ -136,7 +144,12 @@ public class MainActivity extends AppCompatActivity {
             partialWakeLock.release();
         }
     }
-
+    @Override
+    protected void onDestroy()
+    {
+        super.onDestroy();
+        Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, defTimeOut);
+    }
     // Called whenever we need to wake up the device
     public void wakeDevice() {
         fullWakeLock.acquire();
