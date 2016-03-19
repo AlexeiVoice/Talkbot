@@ -129,33 +129,35 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        switch (keyCode) {
+        String path2file = KeyBinder.giveFileName(keyCode, event, getApplicationContext());
+        if(path2file != null && !path2file.isEmpty() && path2file.compareTo("-1") != 0) {
+            Log.i(getClass().getSimpleName() + "onKeyUp", "Path to file: " + path2file);
+            playSound(path2file);
+            return true;
+        }else {
+            Log.i(getClass().getSimpleName() + "onKeyUp", "No path to file or no suitable key " +
+                    "was pressed ");
+            return super.onKeyUp(keyCode, event);
+        }
+        /*switch (keyCode) {
             case KeyEvent.KEYCODE_0:
-                wakeDevice();
                 playSound(getString(R.string._0));
-                showMessage("0");
                 return true;
             case KeyEvent.KEYCODE_1:
-                showMessage("1");
                 return true;
             case KeyEvent.KEYCODE_2:
-                showMessage("2");
                 return true;
             case KeyEvent.KEYCODE_D:
-                showMessage("D");
                 return true;
             case KeyEvent.KEYCODE_F:
-                showMessage("F");
                 return true;
             case KeyEvent.KEYCODE_J:
-                showMessage("J");
                 return true;
             case KeyEvent.KEYCODE_K:
-                showMessage("K");
                 return true;
             default:
                 return super.onKeyUp(keyCode, event);
-        }
+        }*/
     }
 
 
@@ -199,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
      * Stop audio-playback. Does nothing if there's no playback.
      * Resets mediaplayer, but doesn' releases it.
      * @return TRUE if sound was stopped or nothing was playing. FALSE if there's no instance of
-     * mediaPlayer.
+     * mediaPlayer or it's not initialized
      */
     public boolean checkAndstopSound(){
         if (mediaPlayer == null) {
@@ -212,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
                 mediaPlayer.reset();
             } catch (IllegalStateException e) {
                 Log.e(getClass().getSimpleName(), "checkAndStopSound: " + e.toString());
-                return true;
+                return false;
             }
             return true;
         }

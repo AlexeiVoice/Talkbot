@@ -33,8 +33,6 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_device_filter" />
         </activity>
-        <activity android:name=".SomeActivity" >
-        </activity>
         <receiver
             android:name="com.pd.a2.talkbot.StartAtBootReceiver"
             android:exported="true" >
