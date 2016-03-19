@@ -1,5 +1,6 @@
 package com.pd.a2.talkbot;
 
+import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -15,9 +16,13 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.ImageView;
 import android.widget.Toast;
-import android.app.KeyguardManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +36,9 @@ public class MainActivity extends AppCompatActivity {
     int defTimeOut = 0;
 
     private static String AUDIO_FOLDER;
+    private static String MESSAGE_FOLDER;
     MediaPlayer mediaPlayer;
+    ImageView ivPicMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,52 +53,17 @@ public class MainActivity extends AppCompatActivity {
         }
         AUDIO_FOLDER = Environment.getExternalStorageDirectory().toString() + File.separator +
                 getResources().getString(R.string.audio_folder);
-        createAudioDir(AUDIO_FOLDER);
+        MESSAGE_FOLDER = Environment.getExternalStorageDirectory().toString() + File.separator +
+                getResources().getString(R.string.message_folder);
+        createDir(AUDIO_FOLDER);
+        createDir(MESSAGE_FOLDER);
         setBright(0f);
         this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         defTimeOut = Settings.System.getInt(getContentResolver(),
                 Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         createWakeLocks();
-        Button btnMakeBrighter = (Button)findViewById(R.id.raiseBrightness);
-        btnMakeBrighter.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                params = getWindow().getAttributes();
-                //float brightness = params.screenBrightness;
-                /*if (brightness <= 0.9f) {
-                    params.screenBrightness = brightness + 0.1f;
-                }*/
-                //getWindow().setAttributes(params);
-                setBright(1f);
-            }
-        });
-        Button btnDim = (Button)findViewById(R.id.lowerBrightness);
-        btnDim.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                /*params = getWindow().getAttributes();
-                float brightness = params.screenBrightness;
-                if (brightness >= 0.1f){
-                    params.screenBrightness = brightness - 0.1f;
-                }
-                getWindow().setAttributes(params);*/
-                setBright(0f);
-            }
-        });
-        Button btnPlaySound = (Button)findViewById(R.id.play);
-        btnPlaySound.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                playSound(getString(R.string._0));
-            }
-        });
-        Button btnStopSound = (Button)findViewById(R.id.stop);
-        btnStopSound.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                checkAndstopSound();
-            }
-        });
+        ivPicMessage = (ImageView)findViewById(R.id.ivPictureMessage);
+        ivPicMessage.setScaleType(ImageView.ScaleType.FIT_XY);
     }
     @Override
     protected void onPause(){
@@ -139,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
         String path2file = KeyBinder.giveFileName(keyCode, event, getApplicationContext());
         if(path2file != null && !path2file.isEmpty() && path2file.compareTo("-1") != 0) {
             Log.i(getClass().getSimpleName() + "onKeyUp", "Path to file: " + path2file);
+            showPicture("a.jpg");
             playSound(path2file);
             return true;
         }else {
@@ -146,25 +119,6 @@ public class MainActivity extends AppCompatActivity {
                     "was pressed ");
             return super.onKeyUp(keyCode, event);
         }
-        /*switch (keyCode) {
-            case KeyEvent.KEYCODE_0:
-                playSound(getString(R.string._0));
-                return true;
-            case KeyEvent.KEYCODE_1:
-                return true;
-            case KeyEvent.KEYCODE_2:
-                return true;
-            case KeyEvent.KEYCODE_D:
-                return true;
-            case KeyEvent.KEYCODE_F:
-                return true;
-            case KeyEvent.KEYCODE_J:
-                return true;
-            case KeyEvent.KEYCODE_K:
-                return true;
-            default:
-                return super.onKeyUp(keyCode, event);
-        }*/
     }
 
 
@@ -227,15 +181,39 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void showMessage(String message){
-        Toast.makeText(this, message,Toast.LENGTH_SHORT).show();
+    public void showPicture(String fileName) {
+        final Uri uri = Uri.parse("file://" + MESSAGE_FOLDER + File.separator + fileName);
+        File message = new File(uri.getPath());
+        if(!message.exists()) {
+            Log.i(getClass().getSimpleName(), "showPicture(). file " + uri.toString() + " doesn't " +
+                    "exist");
+            return;
+        }
+        Log.i(getClass().getSimpleName(), "showPicture(). File uri: " + uri.toString());
+        if (!isExternalStorageReadable()) {
+            Log.i(getClass().getSimpleName(), "showPicture(): external storage isn't readable");
+            return;
+        }
+        //Everything is ok, so we can show picture:
+        setBright(0.7f);
+        if(ivPicMessage.getVisibility() == View.VISIBLE) {
+            //in this case we must fade out currently visible image and set new one
+            fadeOutImageView(ivPicMessage, uri, true);
+        } else{
+            //in this case we must fade in picture and then fade it out
+            fadeInImageView(ivPicMessage, uri);
+        }
     }
 
+//region additional
     public void setBright(float value) {
         Window mywindow = getWindow();
         WindowManager.LayoutParams lp = mywindow.getAttributes();
         lp.screenBrightness = value;
         mywindow.setAttributes(lp);
+    }
+    public void showMessage(String message){
+        Toast.makeText(this, message,Toast.LENGTH_SHORT).show();
     }
 
     // Called from onCreate
@@ -251,7 +229,6 @@ public class MainActivity extends AppCompatActivity {
         if(fullWakeLock != null && fullWakeLock.isHeld() == false) {
             fullWakeLock.acquire();
         }
-        KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
 
     }
 
@@ -273,33 +250,95 @@ public class MainActivity extends AppCompatActivity {
         }
         return false;
     }
+//endregion
 
     /**
      * Creates a dir with the given path. Creates missing parent directories if necessary.
      * @param path Folder path.
      * @return Returns TRUE if dir was created. FALSE if there was an error or folder already exists.
      */
-    public boolean createAudioDir(String path) {
-        File audioDir = new File(path);
+    public boolean createDir(String path) {
+        File dir = new File(path);
         if(!isExternalStorageWritable()) {
-            Log.i(getClass().getSimpleName(), "createAudioDir: External storage isn't writable");
+            Log.i(getClass().getSimpleName(), "createDir: External storage isn't writable");
             return false;
         }
         try{
-            if (!audioDir.exists()) {
-                audioDir.mkdirs();
-                Log.i(getClass().getSimpleName(), audioDir.toString() + " folder was created");
+            if (!dir.exists()) {
+                dir.mkdirs();
+                Log.i(getClass().getSimpleName(), dir.toString() + " folder was created");
                 return true;
             } else{
-                Log.i(getClass().getSimpleName(), audioDir.toString() + " folder already exists");
+                Log.i(getClass().getSimpleName(), dir.toString() + " folder already exists");
                 return false;
             }
         } catch (Exception e) {
             Log.i(getClass().getSimpleName(), "An error occurred creating the folder "
-                    + audioDir.toString());
+                    + dir.toString());
             e.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * Fades ImageView in and then fades it out
+     * @param imageView
+     * @param imageUri
+     */
+    private void fadeInImageView(final ImageView imageView, final Uri imageUri) {
+        Animation fadeIn = new AlphaAnimation(0, 1);
+        fadeIn.setInterpolator(new DecelerateInterpolator());
+        fadeIn.setDuration(300);
+        fadeIn.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+                imageView.setImageURI(imageUri);
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                fadeOutImageView(imageView, imageUri, false);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+
+            }
+        });
+        imageView.startAnimation(fadeIn);
+    }
+
+    /**
+     * Fades ImageView out and if needed fades it in.
+     * @param imageView
+     * @param imageUri
+     * @param fadeInAfter If after fadeout animation should be called fadein
+     */
+    private void fadeOutImageView(final ImageView imageView, final Uri imageUri, boolean fadeInAfter) {
+        Animation fadeOut = new AlphaAnimation(1, 0);
+        fadeOut.setInterpolator(new AccelerateInterpolator());
+        fadeOut.setDuration(300);
+        if(fadeInAfter) {
+            //if we need to fade in after this animation (fade out -> change image -> start fade in)
+            fadeOut.setAnimationListener(new Animation.AnimationListener() {
+                @Override
+                public void onAnimationStart(Animation animation) {
+
+                }
+
+                @Override
+                public void onAnimationEnd(Animation animation) {
+                    imageView.setImageURI(imageUri);
+                    fadeInImageView(imageView, imageUri);
+                }
+
+                @Override
+                public void onAnimationRepeat(Animation animation) {
+
+                }
+            });
+        }
+        imageView.startAnimation(fadeOut);
     }
 
 

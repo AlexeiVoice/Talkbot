@@ -10,7 +10,7 @@ public final class KeyBinder {
 
     public static String giveFileName(int keycode, KeyEvent event, Context context) {
         String fileName = "";
-        switch (keycode) {
+        /*switch (keycode) {
             //Numbers
             case KeyEvent.KEYCODE_0:
                 fileName = context.getString(R.string._0);
@@ -228,7 +228,7 @@ public final class KeyBinder {
             //We should indicate that there were no suitable key-kodes:
             default: fileName = "-1";
                 break;
-        }
+        }*/
         return fileName;
     }
     

@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Talkbot</string>
     <string name="audio_folder">Talkbot/audio</string>
+    <string name="message_folder">Talkbot/message</string>
     <!-- - - - AUDIO-FILES NAMES - - - -->
             <!--Numbers-->
     <string name="_0">audio-0.mp3</string>
