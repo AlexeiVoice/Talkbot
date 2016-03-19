@@ -82,20 +82,26 @@ public class MainActivity extends AppCompatActivity {
         btnStopSound.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                stopSound();
+                checkAndstopSound();
             }
         });
     }
     @Override
     protected void onPause(){
         super.onPause();
-        partialWakeLock.acquire();
-        stopSound();
+        Log.i(getClass().getSimpleName(), "onPause");
+        if(partialWakeLock != null && partialWakeLock.isHeld() == false) {
+            partialWakeLock.acquire();
+        }
+        if(checkAndstopSound()) {
+            mediaPlayer.release();
+        }
     }
 
     @Override
     protected void onResume(){
         super.onResume();
+        Log.i(getClass().getSimpleName(), "onResume");
         if(fullWakeLock.isHeld()){
             fullWakeLock.release();
         }
@@ -108,10 +114,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy()
     {
         super.onDestroy();
+        Log.i(getClass().getSimpleName(), "onDestroy");
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, defTimeOut);
-        if (mediaPlayer!=null && mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
+        if (checkAndstopSound()) {
             mediaPlayer.release();
+        }
+        if(fullWakeLock.isHeld()){
+            fullWakeLock.release();
+        }
+        if(partialWakeLock.isHeld()){
+            partialWakeLock.release();
         }
     }
 
@@ -162,9 +174,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         //we should stop playing audio-file if it's playing at the moment
-        if (mediaPlayer!=null && mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
-        } else{
+        if (!checkAndstopSound()) {
             mediaPlayer = new MediaPlayer();
         }
         try {
@@ -175,19 +185,36 @@ public class MainActivity extends AppCompatActivity {
             mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
-                    mediaPlayer.release();
+                    mediaPlayer.reset();
                 }
             });
 
-        } catch (IOException e) {
+        } catch (IOException  | IllegalStateException | IllegalArgumentException |SecurityException
+                e ) {
             Log.e(getClass().getSimpleName(), "playSound() error: " + e.toString());
         }
     }
 
-    public void stopSound(){
-        if (mediaPlayer!=null && mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
-            mediaPlayer.release();
+    /**
+     * Stop audio-playback. Does nothing if there's no playback.
+     * Resets mediaplayer, but doesn' releases it.
+     * @return TRUE if sound was stopped or nothing was playing. FALSE if there's no instance of
+     * mediaPlayer.
+     */
+    public boolean checkAndstopSound(){
+        if (mediaPlayer == null) {
+            return false;
+        } else {
+            try {
+                if(mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.reset();
+            } catch (IllegalStateException e) {
+                Log.e(getClass().getSimpleName(), "checkAndStopSound: " + e.toString());
+                return true;
+            }
+            return true;
         }
     }
 
@@ -205,14 +232,16 @@ public class MainActivity extends AppCompatActivity {
     // Called from onCreate
     protected void createWakeLocks(){
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        fullWakeLock = powerManager.newWakeLock((PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP), "Loneworker - FULL WAKE LOCK");
+        fullWakeLock = powerManager.newWakeLock((PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP), "Talkbot - FULL WAKE LOCK");
         partialWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Talkbot - PARTIAL WAKE LOCK");
     }
 
 
     // Called whenever we need to wake up the device
     public void wakeDevice() {
-        fullWakeLock.acquire();
+        if(fullWakeLock != null && fullWakeLock.isHeld() == false) {
+            fullWakeLock.acquire();
+        }
         KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
 
     }
