@@ -9,10 +9,13 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -46,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         //If device run's Android 4.0+ then hide navigation bar
-        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
             View decorView = getWindow().getDecorView();
             int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
             decorView.setSystemUiVisibility(uiOptions);
@@ -70,11 +73,17 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         Log.i(getClass().getSimpleName(), "onPause");
         if(partialWakeLock != null && partialWakeLock.isHeld() == false) {
-            //partialWakeLock.acquire();
+            partialWakeLock.acquire();
         }
         if(checkAndstopSound()) {
             mediaPlayer.release();
         }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.i(getClass().getSimpleName(), "onStop");
     }
 
     @Override
@@ -85,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
-            //partialWakeLock.release();
+            partialWakeLock.release();
         }
     }
 
@@ -102,17 +111,18 @@ public class MainActivity extends AppCompatActivity {
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
-            //partialWakeLock.release();
+            partialWakeLock.release();
         }
     }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        String path2file = KeyBinder.giveFileName(keyCode, event, getApplicationContext());
-        if(path2file != null && !path2file.isEmpty() && path2file.compareTo("-1") != 0) {
-            Log.i(getClass().getSimpleName() + "onKeyUp", "Path to file: " + path2file);
-            showPicture("a.jpg");
-            playSound(path2file);
+        //String fileName = KeyBinder.giveFileName(keyCode, event, getApplicationContext());
+        String fileName = KeyBinder.getName(event);
+        if (fileName != null && !fileName.isEmpty() && fileName.compareTo("-1") != 0) {
+            Log.i(getClass().getSimpleName() + "onKeyUp", "Path to file: " + fileName);
+            playSound("audio-" + fileName + ".mp3");
+            showPicture(fileName + ".jpg");
             return true;
         }else {
             Log.i(getClass().getSimpleName() + "onKeyUp", "No path to file or no suitable key " +
@@ -121,6 +131,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        return super.dispatchTouchEvent(ev);
+    }
 
     public void playSound(String fileName) {
         Uri uri = Uri.parse("file://" + AUDIO_FOLDER + File.separator + fileName);
@@ -149,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
                     mediaPlayer.reset();
+                    fadeOutImageView(ivPicMessage, null, false);
                 }
             });
 
@@ -195,11 +210,19 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         //Everything is ok, so we can show picture:
+        //let's make screen bright and active while picture's on the display
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            View decorView = getWindow().getDecorView();
+            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+            decorView.setSystemUiVisibility(uiOptions);
+        }
         setBright(0.7f);
+        makeKeepScreenOn();
         if(ivPicMessage.getVisibility() == View.VISIBLE) {
             //in this case we must fade out currently visible image and set new one
             fadeOutImageView(ivPicMessage, uri, true);
         } else{
+            ivPicMessage.setVisibility(View.VISIBLE);
             //in this case we must fade in picture and then fade it out
             fadeInImageView(ivPicMessage, uri);
         }
@@ -288,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
     private void fadeInImageView(final ImageView imageView, final Uri imageUri) {
         Animation fadeIn = new AlphaAnimation(0, 1);
         fadeIn.setInterpolator(new DecelerateInterpolator());
-        fadeIn.setDuration(300);
+        fadeIn.setDuration(500);
         fadeIn.setAnimationListener(new Animation.AnimationListener() {
             @Override
             public void onAnimationStart(Animation animation) {
@@ -297,7 +320,6 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onAnimationEnd(Animation animation) {
-                fadeOutImageView(imageView, imageUri, false);
             }
 
             @Override
@@ -317,8 +339,8 @@ public class MainActivity extends AppCompatActivity {
     private void fadeOutImageView(final ImageView imageView, final Uri imageUri, boolean fadeInAfter) {
         Animation fadeOut = new AlphaAnimation(1, 0);
         fadeOut.setInterpolator(new AccelerateInterpolator());
-        fadeOut.setDuration(300);
-        if(fadeInAfter) {
+        fadeOut.setDuration(500);
+        if(fadeInAfter && imageUri != null) {
             //if we need to fade in after this animation (fade out -> change image -> start fade in)
             fadeOut.setAnimationListener(new Animation.AnimationListener() {
                 @Override
@@ -337,9 +359,36 @@ public class MainActivity extends AppCompatActivity {
 
                 }
             });
+        } else{
+            //we need to fade out and set brightness to 0
+            fadeOut.setAnimationListener(new Animation.AnimationListener() {
+                @Override
+                public void onAnimationStart(Animation animation) {
+
+                }
+
+                @Override
+                public void onAnimationEnd(Animation animation) {
+                    setBright(0);
+                    imageView.setVisibility(View.INVISIBLE);
+                    dismissKeepScreenOn();
+                }
+
+                @Override
+                public void onAnimationRepeat(Animation animation) {
+
+                }
+            });
         }
         imageView.startAnimation(fadeOut);
+
     }
 
+    public void makeKeepScreenOn(){
+        this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+    public void dismissKeepScreenOn(){
+        this.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+    }
 }

@@ -8,7 +8,7 @@ public final class KeyBinder {
     private KeyBinder(){
     }
 
-    public static String giveFileName(int keycode, KeyEvent event, Context context) {
+    public static String giveAudioFileName(int keycode, KeyEvent event, Context context) {
         String fileName = "";
         /*switch (keycode) {
             //Numbers
@@ -229,9 +229,27 @@ public final class KeyBinder {
             default: fileName = "-1";
                 break;
         }*/
-        return fileName;
+
+        return getName(event).concat(".mp3");
     }
-    
+    public static String giveMessageFileName(int keycode, KeyEvent event, Context context) {
+        String fileName = "";
+        return getName(event).concat(".jpg");
+    }
+    public static String getName(KeyEvent event) {
+        StringBuffer sb = new StringBuffer();
+        //TODO check character if it belong to needes set (numbers and letters)
+        if(Character.isLetterOrDigit((char)event.getUnicodeChar())) {
+            if(isCapsOrShiftOn(event) && !Character.isDigit((char)event.getUnicodeChar())) {
+                sb.append("b");
+            }
+            char unicodeChar = (char)event.getUnicodeChar();
+            sb.append(unicodeChar);
+        }else {
+            sb.append("-1");
+        }
+        return sb.toString();
+    }
     public static boolean isCapsOrShiftOn(KeyEvent keyEvent) {
         return keyEvent.isShiftPressed() || keyEvent.isCapsLockOn();
     }
