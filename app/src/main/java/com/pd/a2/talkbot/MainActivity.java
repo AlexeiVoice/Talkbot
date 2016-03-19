@@ -4,6 +4,7 @@ import android.content.Context;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -36,6 +37,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
+        //If device run's Android 4.0+ then hide navigation bar
+        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            View decorView = getWindow().getDecorView();
+            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+            decorView.setSystemUiVisibility(uiOptions);
+        }
         AUDIO_FOLDER = Environment.getExternalStorageDirectory().toString() + File.separator +
                 getResources().getString(R.string.audio_folder);
         createAudioDir(AUDIO_FOLDER);
@@ -43,7 +51,6 @@ public class MainActivity extends AppCompatActivity {
         this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         defTimeOut = Settings.System.getInt(getContentResolver(),
                 Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
-        Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         createWakeLocks();
         Button btnMakeBrighter = (Button)findViewById(R.id.raiseBrightness);
         btnMakeBrighter.setOnClickListener(new View.OnClickListener() {
@@ -91,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         Log.i(getClass().getSimpleName(), "onPause");
         if(partialWakeLock != null && partialWakeLock.isHeld() == false) {
-            partialWakeLock.acquire();
+            //partialWakeLock.acquire();
         }
         if(checkAndstopSound()) {
             mediaPlayer.release();
@@ -106,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
-            partialWakeLock.release();
+            //partialWakeLock.release();
         }
     }
 
@@ -123,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
-            partialWakeLock.release();
+            //partialWakeLock.release();
         }
     }
 
