@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private static String AUDIO_FOLDER_PREFIX = "audio-";
     private static String AUDIO_FILE_FORMAT = ".mp3";
     private static String MESSAGE_PIC_FORMAT = ".jpg";
-    private static MediaPlayer mediaPlayer;
+    private MediaPlayer mediaPlayer;
     private String currentKey; //currently showed and playback'ed key-event
     private String nextKey; //next key-event to show and playback
 
@@ -114,9 +114,9 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         Log.i(getClass().getSimpleName(), "onDestroy");
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, defTimeOut);
-        /*if (mediaPlayer != null) {
+        if (mediaPlayer != null) {
             mediaPlayer.release();
-        }*/
+        }
         if(fullWakeLock.isHeld()){
             fullWakeLock.release();
         }
@@ -127,14 +127,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
-        outState.putString("currentKey", currentKey);
         super.onSaveInstanceState(outState);
     }
 
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
-        currentKey = savedInstanceState.getString("currentKey");
-        showPicture(currentKey + MESSAGE_PIC_FORMAT);
+
         super.onRestoreInstanceState(savedInstanceState);
     }
 
@@ -195,17 +193,18 @@ public class MainActivity extends AppCompatActivity {
             mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
             /*mediaPlayer.prepare();
             mediaPlayer.start();*/
+            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mediaPlayer) {
+                    mediaPlayer.start();
+                }
+            });
             mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
                     mediaPlayer.reset();
                     hideImage(ivPicMessage);
-                }
-            });
-            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mediaPlayer) {
-                    mediaPlayer.start();
+                    currentKey = "-1";
                 }
             });
             mediaPlayer.prepareAsync();
