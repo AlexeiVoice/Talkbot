@@ -76,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                 Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         createWakeLocks();
         ivPicMessage = (ImageView)findViewById(R.id.ivPictureMessage);
-        ivPicMessage.setScaleType(ImageView.ScaleType.FIT_XY);
+        //ivPicMessage.setScaleType(ImageView.ScaleType.FIT_XY);
     }
     @Override
     protected void onPause(){
