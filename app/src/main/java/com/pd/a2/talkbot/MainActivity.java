@@ -7,6 +7,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.PersistableBundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.support.v4.view.GestureDetectorCompat;
@@ -43,12 +44,18 @@ public class MainActivity extends AppCompatActivity {
     private static float AUDIO_VOLUME = 1f;
     private static float MESSAGE_BRIGHTNESS = 0.7f;
     private static String AUDIO_FOLDER_PREFIX = "audio-";
-    MediaPlayer mediaPlayer;
+    private static String AUDIO_FILE_FORMAT = ".mp3";
+    private static String MESSAGE_PIC_FORMAT = ".jpg";
+    private static MediaPlayer mediaPlayer;
+    private String currentKey; //currently showed and playback'ed key-event
+    private String nextKey; //next key-event to show and playback
+
     ImageView ivPicMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i(getClass().getSimpleName(), "onCreate");
         setContentView(R.layout.activity_main);
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         //If device run's Android 4.0+ then hide navigation bar
@@ -107,15 +114,28 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         Log.i(getClass().getSimpleName(), "onDestroy");
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, defTimeOut);
-        if (mediaPlayer != null) {
+        /*if (mediaPlayer != null) {
             mediaPlayer.release();
-        }
+        }*/
         if(fullWakeLock.isHeld()){
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
             partialWakeLock.release();
         }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putString("currentKey", currentKey);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        currentKey = savedInstanceState.getString("currentKey");
+        showPicture(currentKey + MESSAGE_PIC_FORMAT);
+        super.onRestoreInstanceState(savedInstanceState);
     }
 
     @Override
@@ -126,8 +146,9 @@ public class MainActivity extends AppCompatActivity {
             Log.i(getClass().getSimpleName() + " onKeyUp", "Event name: " + eventName);
             //Now we should try play audio. If we are unable to do it then we shouldn't show picture
             //for now:
-            if(playSound(AUDIO_FOLDER_PREFIX + eventName + ".mp3")) {
-                showPicture(eventName + ".jpg");
+            nextKey = eventName;
+            if(playSound(AUDIO_FOLDER_PREFIX + eventName + AUDIO_FILE_FORMAT)) {
+                showPicture(eventName + MESSAGE_PIC_FORMAT);
             }
             return true;
         }else {
@@ -188,6 +209,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             mediaPlayer.prepareAsync();
+            currentKey = nextKey;
             return true;
 
         } catch (IOException  | IllegalStateException | IllegalArgumentException |SecurityException
