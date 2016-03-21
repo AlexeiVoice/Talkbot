@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private static String MESSAGE_FOLDER;
     private static float AUDIO_VOLUME = 1f;
     private static float MESSAGE_BRIGHTNESS = 0.7f;
+    private static String AUDIO_FOLDER_PREFIX = "audio-";
     MediaPlayer mediaPlayer;
     ImageView ivPicMessage;
 
@@ -125,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i(getClass().getSimpleName() + " onKeyUp", "Event name: " + eventName);
             //Now we should try play audio. If we are unable to do it then we shouldn't show picture
             //for now:
-            if(playSound("audio-" + eventName + ".mp3")) {
+            if(playSound(AUDIO_FOLDER_PREFIX + eventName + ".mp3")) {
                 showPicture(eventName + ".jpg");
             }
             return true;
@@ -154,7 +155,6 @@ public class MainActivity extends AppCompatActivity {
         if(!audio.exists()) {
             Log.i(getClass().getSimpleName(), "playSound(). file " + uri.toString() + " doesn't " +
                     "exist");
-            checkAndstopSound();
             return false;
         }
         Log.i(getClass().getSimpleName(), "playSound(). File uri: " + uri.toString());
