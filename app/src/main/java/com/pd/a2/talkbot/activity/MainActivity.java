@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
     PowerManager.WakeLock fullWakeLock, partialWakeLock;
     mService mAudioService;
     boolean mBound = false;
+    boolean isConfigurationChanged = false;
     ImageView ivPicMessage;
     /** Defines callbacks for service binding, passed to bindService() */
     private AudioServiceConnection mConnection;
@@ -80,7 +81,10 @@ public class MainActivity extends AppCompatActivity {
                 ivPicMessage.setVisibility(View.VISIBLE);
             }
         }
+        //Set screen off timeout:
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
+        //Set minimum brightness:
+        setBright(0f);
         //If device run's Android 4.0+ then hide navigation bar
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
             View decorView = getWindow().getDecorView();
@@ -93,8 +97,6 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getString(R.string.message_folder);
         createDir(AUDIO_FOLDER);
         createDir(MESSAGE_FOLDER);
-        //Set minimum brightness:
-        setBright(0f);
         this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         defTimeOut = Settings.System.getInt(getContentResolver(),
                 Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
@@ -152,15 +154,17 @@ public class MainActivity extends AppCompatActivity {
             partialWakeLock.release();
         }
         EventBus.getDefault().unregister(this);
-        if (mBound) {
+        //If we are currently bound to service and onDestroy was called not due to configuration change
+        //then we should unbound service
+        if (mBound && !isConfigurationChanged) {
             getApplicationContext().unbindService(mConnection);
-            mBound = false;
         }
     }
 
     @Override
     public Object onRetainCustomNonConfigurationInstance() {
         Log.i(getClass().getSimpleName(), "onRetainCustom....");
+        isConfigurationChanged = true;
         if(mBound) {
             return mConnection;
         } else{
