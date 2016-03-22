@@ -72,19 +72,32 @@ public class MainActivity extends AppCompatActivity {
                     + e.toString());
         }
         connectToService();
+        //if we are connected to service we should check whether music is playing and whether
+        //picture should be shown
         if(mAudioService != null) {
+            Log.i(getClass().getSimpleName(), "onCreate: service is connected");
             if(mAudioService.getCurrentState() == State.START_PLAYING) {
                 String keyName = mAudioService.getCurrentKeyProcessed();
                 Uri imageUri = Uri.parse("file://" + MESSAGE_FOLDER + File.separator +
                         keyName  + MESSAGE_PIC_FORMAT);
-                ivPicMessage.setImageURI(imageUri);
-                ivPicMessage.setVisibility(View.VISIBLE);
+                if(checkIfPathValid(imageUri)) {
+                    ivPicMessage.setImageURI(imageUri);
+                    ivPicMessage.setVisibility(View.VISIBLE);
+                } else{
+                    Log.i(getClass().getSimpleName(), "No such file/folder: " + imageUri.toString());
+                }
             }
         }
-        //Set screen off timeout:
-        Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
-        //Set minimum brightness:
-        setBright(0f);
+        if(ivPicMessage.getVisibility() == View.VISIBLE) {
+            //if picture is visible we should keep the screen on
+            makeKeepScreenOn();
+            setBright(MESSAGE_BRIGHTNESS);
+        } else{
+            //Set screen off timeout:
+            Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
+            //Set minimum brightness:
+            setBright(0f);
+        }
         //If device run's Android 4.0+ then hide navigation bar
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
             View decorView = getWindow().getDecorView();
@@ -157,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
         //If we are currently bound to service and onDestroy was called not due to configuration change
         //then we should unbound service
         if (mBound && !isConfigurationChanged) {
+            Log.i(getClass().getSimpleName(), "onDestroy with no configuration change");
             getApplicationContext().unbindService(mConnection);
         }
     }
@@ -166,6 +180,7 @@ public class MainActivity extends AppCompatActivity {
         Log.i(getClass().getSimpleName(), "onRetainCustom....");
         isConfigurationChanged = true;
         if(mBound) {
+            Log.i(getClass().getSimpleName(), "...return connection");
             return mConnection;
         } else{
             return super.onRetainCustomNonConfigurationInstance();
@@ -365,6 +380,11 @@ public class MainActivity extends AppCompatActivity {
         mywindow.setAttributes(lp);
     }
 
+    public boolean checkIfPathValid(Uri pathUri) {
+        File file = new File(pathUri.getPath());
+        return file.exists();
+    }
+
     // Called from onCreate
     protected void createWakeLocks(){
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -396,16 +416,19 @@ public class MainActivity extends AppCompatActivity {
     private void connectToService() {
         // Start and bind to service if it wasn't done already:
         if(mConnection == null) {
+            Log.i(getClass().getSimpleName() + "connectToService()", "Connection is null, create new.");
             mConnection = new AudioServiceConnection();
             Intent intent = new Intent(this, mService.class);
             getApplicationContext().startService(intent);
             getApplicationContext().bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         } else{
-            mAudioService = mConnection.mservice;
+            mAudioService = mConnection.binder.getService();
+            mBound = true;
         }
     }
     private class AudioServiceConnection implements ServiceConnection {
-        mService mservice;
+        //mService mservice;
+        mService.LocalBinder binder;
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
             mBound = false;
@@ -415,9 +438,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
             // We've bound to LocalService, cast the IBinder and get LocalService instance
-            mService.LocalBinder binder = (mService.LocalBinder) iBinder;
-            mservice = binder.getService();
-            mAudioService = mservice;
+            binder = (mService.LocalBinder) iBinder;
+            mAudioService = binder.getService();
             mBound = true;
             Log.i(getClass().getSimpleName(), "connected to service successfully "
                     + mAudioService.toString());
