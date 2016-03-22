@@ -1,4 +1,4 @@
-package com.pd.a2.talkbot;
+package com.pd.a2.talkbot.util;
 
 import android.content.Context;
 import android.view.KeyEvent;
@@ -10,7 +10,6 @@ public final class KeyBinder {
 
    public static String getName(KeyEvent event) {
         StringBuffer sb = new StringBuffer();
-        //TODO check character if it belong to needes set (numbers and letters)
         if(isLetterOrDigit((char) event.getUnicodeChar())) {
             if(Character.isUpperCase((char)event.getUnicodeChar())) {
                 sb.append("b");

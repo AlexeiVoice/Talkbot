@@ -1,20 +1,18 @@
-package com.pd.a2.talkbot;
+package com.pd.a2.talkbot.activity;
 
-import android.animation.ObjectAnimator;
+import android.content.ComponentName;
 import android.content.Context;
-import android.media.AudioManager;
-import android.media.MediaPlayer;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.os.PersistableBundle;
+import android.os.IBinder;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.GestureDetector;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -23,40 +21,65 @@ import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
-import android.view.animation.AnimationSet;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
-import android.widget.Toast;
+
+import com.pd.a2.talkbot.util.KeyBinder;
+import com.pd.a2.talkbot.R;
+import com.pd.a2.talkbot.util.PlaybackEvent;
+import com.pd.a2.talkbot.util.State;
+import com.pd.a2.talkbot.util.StorageUtil;
+import com.pd.a2.talkbot.service.mService;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
 
 import java.io.File;
-import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
-    WindowManager.LayoutParams params;
-    PowerManager.WakeLock fullWakeLock, partialWakeLock;
+    private static String MESSAGE_FOLDER;
+    private static float MESSAGE_BRIGHTNESS = 0.7f;
+    private static String MESSAGE_PIC_FORMAT = ".jpg";
+    private static String AUDIO_FOLDER;
+    private static String AUDIO_FOLDER_PREFIX = "audio-";
+    private static String AUDIO_FILE_FORMAT = ".mp3";
     /*Delay before screen goes off*/
     private static final int DELAY = 0;
     /*Default delay before screen goes off. The state before app was launched*/
-    int defTimeOut = 0;
+    private int defTimeOut = 0;
 
-    private static String AUDIO_FOLDER;
-    private static String MESSAGE_FOLDER;
-    private static float AUDIO_VOLUME = 1f;
-    private static float MESSAGE_BRIGHTNESS = 0.7f;
-    private static String AUDIO_FOLDER_PREFIX = "audio-";
-    private static String AUDIO_FILE_FORMAT = ".mp3";
-    private static String MESSAGE_PIC_FORMAT = ".jpg";
-    private MediaPlayer mediaPlayer;
-    private String currentKey; //currently showed and playback'ed key-event
-    private String nextKey; //next key-event to show and playback
-
+    WindowManager.LayoutParams params;
+    PowerManager.WakeLock fullWakeLock, partialWakeLock;
+    mService mAudioService;
+    boolean mBound = false;
     ImageView ivPicMessage;
+    /** Defines callbacks for service binding, passed to bindService() */
+    private AudioServiceConnection mConnection;
 
+//region State Methods
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        EventBus.getDefault().register(this);
         Log.i(getClass().getSimpleName(), "onCreate");
         setContentView(R.layout.activity_main);
+        ivPicMessage = (ImageView)findViewById(R.id.ivPictureMessage);
+        try {
+            mConnection = (AudioServiceConnection)getLastCustomNonConfigurationInstance();
+        } catch (ClassCastException e) {
+            Log.i(getClass().getSimpleName(), "onCreate, trying to get retain audioService: "
+                    + e.toString());
+        }
+        connectToService();
+        if(mAudioService != null) {
+            if(mAudioService.getCurrentState() == State.START_PLAYING) {
+                String keyName = mAudioService.getCurrentKeyProcessed();
+                Uri imageUri = Uri.parse("file://" + MESSAGE_FOLDER + File.separator +
+                        keyName  + MESSAGE_PIC_FORMAT);
+                ivPicMessage.setImageURI(imageUri);
+                ivPicMessage.setVisibility(View.VISIBLE);
+            }
+        }
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         //If device run's Android 4.0+ then hide navigation bar
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
@@ -70,14 +93,20 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getString(R.string.message_folder);
         createDir(AUDIO_FOLDER);
         createDir(MESSAGE_FOLDER);
+        //Set minimum brightness:
         setBright(0f);
         this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         defTimeOut = Settings.System.getInt(getContentResolver(),
                 Settings.System.SCREEN_OFF_TIMEOUT, DELAY);
         createWakeLocks();
-        ivPicMessage = (ImageView)findViewById(R.id.ivPictureMessage);
-        //ivPicMessage.setScaleType(ImageView.ScaleType.FIT_XY);
+
     }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
     @Override
     protected void onPause(){
         super.onPause();
@@ -92,8 +121,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        super.onStop();
         Log.i(getClass().getSimpleName(), "onStop");
+
+        super.onStop();
     }
 
     @Override
@@ -114,27 +144,35 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         Log.i(getClass().getSimpleName(), "onDestroy");
         Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_OFF_TIMEOUT, defTimeOut);
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-        }
+
         if(fullWakeLock.isHeld()){
             fullWakeLock.release();
         }
         if(partialWakeLock.isHeld()){
             partialWakeLock.release();
         }
+        EventBus.getDefault().unregister(this);
+        if (mBound) {
+            getApplicationContext().unbindService(mConnection);
+            mBound = false;
+        }
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
+    public Object onRetainCustomNonConfigurationInstance() {
+        Log.i(getClass().getSimpleName(), "onRetainCustom....");
+        if(mBound) {
+            return mConnection;
+        } else{
+            return super.onRetainCustomNonConfigurationInstance();
+        }
     }
 
     @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
-
-        super.onRestoreInstanceState(savedInstanceState);
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        return super.dispatchTouchEvent(ev);
     }
+//endregion
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
@@ -144,101 +182,15 @@ public class MainActivity extends AppCompatActivity {
             Log.i(getClass().getSimpleName() + " onKeyUp", "Event name: " + eventName);
             //Now we should try play audio. If we are unable to do it then we shouldn't show picture
             //for now:
-            nextKey = eventName;
-            if(playSound(AUDIO_FOLDER_PREFIX + eventName + AUDIO_FILE_FORMAT)) {
-                showPicture(eventName + MESSAGE_PIC_FORMAT);
-            }
+            mAudioService.setCurrentKey(eventName);
+            Uri audioFileUri = Uri.parse("file://" + AUDIO_FOLDER + File.separator + AUDIO_FOLDER_PREFIX
+                    + eventName + AUDIO_FILE_FORMAT);
+            mAudioService.playSound(audioFileUri);
             return true;
         }else {
             Log.i(getClass().getSimpleName() + "onKeyUp", "No path to file or no suitable key " +
                     "was pressed ");
             return super.onKeyUp(keyCode, event);
-        }
-    }
-
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        return super.dispatchTouchEvent(ev);
-    }
-
-    /**
-     * Plays sound using given file name (just name in format 'name.mp3', path is generated
-     * automatically)
-     * @param fileName File name ('name.mp3')
-     * @return Returns TRUE if file exists and will be played, FALSE - if there's no such file or
-     * storage is unreadable.
-     */
-    public boolean playSound(String fileName) {
-        Uri uri = Uri.parse("file://" + AUDIO_FOLDER + File.separator + fileName);
-        File audio = new File(uri.getPath());
-        if(!audio.exists()) {
-            Log.i(getClass().getSimpleName(), "playSound(). file " + uri.toString() + " doesn't " +
-                    "exist");
-            return false;
-        }
-        Log.i(getClass().getSimpleName(), "playSound(). File uri: " + uri.toString());
-
-        if (!isExternalStorageReadable()) {
-            Log.i(getClass().getSimpleName(), "playSound(): external storage isn't readable");
-            return false;
-        }
-        //we should stop playing audio-file if it's playing at the moment
-        if (!checkAndstopSound()) {
-            mediaPlayer = new MediaPlayer();
-        }
-        try {
-            mediaPlayer.setDataSource(getApplicationContext(), uri);
-            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            mediaPlayer.setVolume(AUDIO_VOLUME, AUDIO_VOLUME);
-            mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
-            /*mediaPlayer.prepare();
-            mediaPlayer.start();*/
-            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mediaPlayer) {
-                    mediaPlayer.start();
-                }
-            });
-            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                @Override
-                public void onCompletion(MediaPlayer mediaPlayer) {
-                    mediaPlayer.reset();
-                    hideImage(ivPicMessage);
-                    currentKey = "-1";
-                }
-            });
-            mediaPlayer.prepareAsync();
-            currentKey = nextKey;
-            return true;
-
-        } catch (IOException  | IllegalStateException | IllegalArgumentException |SecurityException
-                e ) {
-            Log.e(getClass().getSimpleName(), "playSound() error: " + e.toString());
-            return false;
-        }
-    }
-
-    /**
-     * Stop audio-playback. Does nothing if there's no playback.
-     * Resets mediaplayer, but doesn' releases it.
-     * @return TRUE if sound was stopped or nothing was playing. FALSE if there's no instance of
-     * mediaPlayer or it's not initialized
-     */
-    public boolean checkAndstopSound(){
-        if (mediaPlayer == null) {
-            return false;
-        } else {
-            try {
-                if(mediaPlayer.isPlaying()) {
-                    mediaPlayer.stop();
-                    hideImage(ivPicMessage); //also we should hide current picture
-                }
-                mediaPlayer.reset();
-            } catch (IllegalStateException e) {
-                Log.e(getClass().getSimpleName(), "checkAndStopSound: " + e.toString());
-                return false;
-            }
-            return true;
         }
     }
 
@@ -255,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Log.i(getClass().getSimpleName(), "showPicture(). File uri: " + uri.toString());
-        if (!isExternalStorageReadable()) {
+        if (!StorageUtil.isExternalStorageReadable()) {
             Log.i(getClass().getSimpleName(), "showPicture(): external storage isn't readable");
             return;
         }
@@ -269,10 +221,9 @@ public class MainActivity extends AppCompatActivity {
         setBright(MESSAGE_BRIGHTNESS);
         makeKeepScreenOn();
         if(ivPicMessage.getVisibility() == View.VISIBLE) {
-            //in this case we must fade out currently visible image and set new one
+            //in this case we must fade out currently visible image, set new one and fade it in
             fadeOutImageView(ivPicMessage, uri, true);
         } else{
-            ivPicMessage.setVisibility(View.VISIBLE);
             //in this case we must fade in picture and then fade it out
             fadeInImageView(ivPicMessage, uri);
         }
@@ -285,7 +236,7 @@ public class MainActivity extends AppCompatActivity {
      */
     public boolean createDir(String path) {
         File dir = new File(path);
-        if(!isExternalStorageWritable()) {
+        if(!StorageUtil.isExternalStorageWritable()) {
             Log.i(getClass().getSimpleName(), "createDir: External storage isn't writable");
             return false;
         }
@@ -306,9 +257,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void hideImage(ImageView imageView){
+    public void hidePicture(ImageView imageView){
         fadeOutImageView(imageView, null, false);
     }
+
     /**
      * Fades ImageView in.
      * @param imageView
@@ -322,6 +274,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onAnimationStart(Animation animation) {
                 imageView.setImageURI(imageUri);
+                imageView.setVisibility(View.VISIBLE);
             }
 
             @Override
@@ -421,28 +374,49 @@ public class MainActivity extends AppCompatActivity {
         if(fullWakeLock != null && fullWakeLock.isHeld() == false) {
             fullWakeLock.acquire();
         }
-
-    }
-
-    /* Checks if external storage is available for read and write */
-    public boolean isExternalStorageWritable() {
-        String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state)) {
-            return true;
-        }
-        return false;
-    }
-
-    /* Checks if external storage is available to at least read */
-    public boolean isExternalStorageReadable() {
-        String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state) ||
-                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
-            return true;
-        }
-        return false;
     }
 //endregion
 
+    @Subscribe
+    public void onPlaybackEvent(PlaybackEvent event){
+        switch (event.state) {
+            case START_PLAYING:
+                showPicture(mAudioService.getCurrentKeyProcessed() + MESSAGE_PIC_FORMAT);
+                break;
+            case STOP_PLAYING:
+                hidePicture(ivPicMessage);
+                break;
+        }
+    }
 
+    private void connectToService() {
+        // Start and bind to service if it wasn't done already:
+        if(mConnection == null) {
+            mConnection = new AudioServiceConnection();
+            Intent intent = new Intent(this, mService.class);
+            getApplicationContext().startService(intent);
+            getApplicationContext().bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+        } else{
+            mAudioService = mConnection.mservice;
+        }
+    }
+    private class AudioServiceConnection implements ServiceConnection {
+        mService mservice;
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            mBound = false;
+            Log.i(getClass().getSimpleName(), "disconnected from service successfully");
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            // We've bound to LocalService, cast the IBinder and get LocalService instance
+            mService.LocalBinder binder = (mService.LocalBinder) iBinder;
+            mservice = binder.getService();
+            mAudioService = mservice;
+            mBound = true;
+            Log.i(getClass().getSimpleName(), "connected to service successfully "
+                    + mAudioService.toString());
+        }
+    }
 }
